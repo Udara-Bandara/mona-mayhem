@@ -8,10 +8,274 @@
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="viewport" content="width=device-width" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Mona Mayhem</title>
+		<title>Mona Mayhem — GitHub Contribution Battle Arena</title>
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			body {
+				font-family: monospace;
+				background: #0a0a0f;
+				color: #fff;
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				padding: 2rem 1rem;
+			}
+
+			header {
+				text-align: center;
+				margin-bottom: 2.5rem;
+			}
+
+			header h1 {
+				font-size: 2rem;
+				color: #00f5ff;
+				letter-spacing: 0.05em;
+				margin-bottom: 0.5rem;
+			}
+
+			header p {
+				color: #a0a0b0;
+				font-size: 0.9rem;
+			}
+
+			.battle-form {
+				width: 100%;
+				max-width: 600px;
+			}
+
+			.players {
+				display: flex;
+				align-items: flex-end;
+				gap: 1rem;
+				margin-bottom: 1.5rem;
+			}
+
+			.player {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+			}
+
+			.player label {
+				font-size: 0.75rem;
+				color: #a0a0b0;
+				text-transform: uppercase;
+				letter-spacing: 0.1em;
+			}
+
+			.player input {
+				width: 100%;
+				padding: 0.6rem 0.75rem;
+				background: #12121a;
+				border: 1px solid #2a2a3a;
+				border-radius: 6px;
+				color: #fff;
+				font-family: monospace;
+				font-size: 0.95rem;
+			}
+
+			.player input:focus {
+				outline: none;
+				border-color: #00f5ff;
+			}
+
+			.vs {
+				font-size: 1.1rem;
+				color: #ff00ff;
+				font-weight: bold;
+				padding-bottom: 0.65rem;
+				flex-shrink: 0;
+			}
+
+			.battle-btn {
+				display: block;
+				width: 100%;
+				padding: 0.75rem;
+				background: #00f5ff;
+				color: #0a0a0f;
+				border: none;
+				border-radius: 6px;
+				font-family: monospace;
+				font-size: 1rem;
+				font-weight: bold;
+				cursor: pointer;
+				letter-spacing: 0.05em;
+			}
+
+			.battle-btn:hover {
+				background: #00d4e0;
+			}
+
+			.battle-btn:disabled {
+				opacity: 0.6;
+				cursor: not-allowed;
+			}
+
+			#results {
+				margin-top: 2rem;
+				width: 100%;
+				max-width: 600px;
+				min-height: 3rem;
+			}
+
+			.result-card {
+				background: #12121a;
+				border: 1px solid #2a2a3a;
+				border-radius: 8px;
+				padding: 1.25rem;
+				text-align: center;
+			}
+
+			.result-card .winner {
+				font-size: 1.1rem;
+				color: #00f5ff;
+				margin-bottom: 0.5rem;
+			}
+
+			.result-card .scores {
+				display: flex;
+				justify-content: center;
+				gap: 2rem;
+				color: #a0a0b0;
+				font-size: 0.9rem;
+			}
+
+			.result-card .scores span strong {
+				color: #fff;
+			}
+
+			.error-msg {
+				color: #ff4d4d;
+				font-size: 0.9rem;
+				text-align: center;
+			}
+		</style>
 	</head>
 	<body>
-		<h1>Mona Mayhem</h1>
-		<p>Welcome to Mona Mayhem! Time to build a GitHub Contribution Battle Arena.</p>
+		<header>
+			<h1>⚔️ Mona Mayhem</h1>
+			<p>GitHub Contribution Battle Arena</p>
+		</header>
+
+		<form class="battle-form" id="battle-form">
+			<div class="players">
+				<div class="player">
+					<label for="player1">Player 1</label>
+					<input
+						id="player1"
+						name="player1"
+						type="text"
+						placeholder="GitHub username"
+						autocomplete="off"
+						required
+					/>
+				</div>
+				<span class="vs" aria-hidden="true">VS</span>
+				<div class="player">
+					<label for="player2">Player 2</label>
+					<input
+						id="player2"
+						name="player2"
+						type="text"
+						placeholder="GitHub username"
+						autocomplete="off"
+						required
+					/>
+				</div>
+			</div>
+			<button type="submit" class="battle-btn">⚔️ BATTLE!</button>
+		</form>
+
+		<section id="results" aria-live="polite" aria-label="Battle results"></section>
+
+		<script>
+			const form = document.getElementById('battle-form') as HTMLFormElement;
+			const results = document.getElementById('results') as HTMLElement;
+			const btn = form.querySelector('button') as HTMLButtonElement;
+
+			form.addEventListener('submit', async (e) => {
+				e.preventDefault();
+				const data = new FormData(form);
+				const p1 = (data.get('player1') as string).trim();
+				const p2 = (data.get('player2') as string).trim();
+
+				if (!p1 || !p2) return;
+
+				btn.disabled = true;
+				btn.textContent = 'Loading...';
+				results.innerHTML = '';
+
+				try {
+					const [res1, res2] = await Promise.all([
+						fetch(`/api/contributions/${encodeURIComponent(p1)}`),
+						fetch(`/api/contributions/${encodeURIComponent(p2)}`),
+					]);
+
+					if (!res1.ok) throw new Error(`Failed to fetch data for ${p1}`);
+					if (!res2.ok) throw new Error(`Failed to fetch data for ${p2}`);
+
+					const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
+
+					const score1: number = data1.totalContributions ?? 0;
+					const score2: number = data2.totalContributions ?? 0;
+
+					let winnerLabel: string;
+					let winnerName: string;
+					if (score1 > score2) {
+						winnerLabel = '🏆 ';
+						winnerName = p1;
+					} else if (score2 > score1) {
+						winnerLabel = '🏆 ';
+						winnerName = p2;
+					} else {
+						winnerLabel = "🤝 It's a tie!";
+						winnerName = '';
+					}
+
+					const card = document.createElement('div');
+					card.className = 'result-card';
+
+					const winnerEl = document.createElement('div');
+					winnerEl.className = 'winner';
+					winnerEl.textContent = winnerName ? `${winnerLabel}${winnerName} wins!` : winnerLabel;
+
+					const scoresEl = document.createElement('div');
+					scoresEl.className = 'scores';
+
+					const span1 = document.createElement('span');
+					const strong1 = document.createElement('strong');
+					strong1.textContent = p1;
+					span1.appendChild(strong1);
+					span1.appendChild(document.createTextNode(`: ${score1} contributions`));
+
+					const span2 = document.createElement('span');
+					const strong2 = document.createElement('strong');
+					strong2.textContent = p2;
+					span2.appendChild(strong2);
+					span2.appendChild(document.createTextNode(`: ${score2} contributions`));
+
+					scoresEl.appendChild(span1);
+					scoresEl.appendChild(span2);
+					card.appendChild(winnerEl);
+					card.appendChild(scoresEl);
+					results.appendChild(card);
+				} catch {
+					const errEl = document.createElement('p');
+					errEl.className = 'error-msg';
+					errEl.textContent = 'Something went wrong. Please try again.';
+					results.appendChild(errEl);
+				} finally {
+					btn.disabled = false;
+					btn.textContent = '⚔️ BATTLE!';
+				}
+			});
+		</script>
 	</body>
 </html>
